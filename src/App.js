@@ -2,41 +2,73 @@ import { useState } from 'react';
 
 function App() {
   const [script, setScript] = useState('');
+  const [topic, setTopic] = useState('');
+  const [inputMode, setInputMode] = useState('script'); // 'script' or 'topic'
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState('script');
-  const [userPlan, setUserPlan] = useState('free'); // 'free' or 'pro'
-  const [videoDuration, setVideoDuration] = useState(30); // seconds
-  const [enableMotion, setEnableMotion] = useState(false);
+  const [activeTab, setActiveTab] = useState('create');
+  const [userPlan, setUserPlan] = useState('none'); // 'none', 'starter', 'growth', 'pro'
+  const [videoDuration, setVideoDuration] = useState(30);
+  const [contentType, setContentType] = useState('random'); // 'random' or 'series'
+  const [postFrequency, setPostFrequency] = useState('weekly'); // 'daily', '3xweek', '2xweek', 'weekly'
   
   const BACKEND_URL = 'https://autovid-ai-10.onrender.com';
-  const userCredits = 1250; // Fixed - no setUserCredits needed yet
-  const userEmail = 'pramodbhaskar10@gmail.com'; // TODO: Get from auth later
+  const userEmail = 'pramodbhaskar10@gmail.com'; // TODO: Get from auth
   
-  // FacelessReels logic: Free = 30s max, no motion. Pro = 20min + motion
-  const maxDuration = userPlan === 'pro' ? 1200 : 30; // 20min = 1200s
-  const canUseMotion = userPlan === 'pro';
+  const durationOptions = [
+    { label: '30 seconds', value: 30 },
+    { label: '60 seconds', value: 60 },
+    { label: '5 minutes', value: 300 },
+    { label: '10 minutes', value: 600 },
+    { label: '15 minutes', value: 900 },
+    { label: '20 minutes', value: 1200 },
+  ];
+
+  const planOptions = [
+    { id: 'starter', name: 'Starter', price: 999, videosPerWeek: 1, freq: 'weekly' },
+    { id: 'growth', name: 'Growth', price: 1999, videosPerWeek: 2, freq: '2xweek' },
+    { id: 'pro', name: 'Pro', price: 2999, videosPerWeek: 3, freq: '3xweek' },
+    { id: 'scale', name: 'Scale', price: 4999, videosPerWeek: 7, freq: 'daily' },
+  ];
+
+  const frequencyOptions = [
+    { label: 'Daily', value: 'daily', videosPerWeek: 7 },
+    { label: '3x per week', value: '3xweek', videosPerWeek: 3 },
+    { label: '2x per week', value: '2xweek', videosPerWeek: 2 },
+    { label: 'Weekly', value: 'weekly', videosPerWeek: 1 },
+  ];
+
+  const selectedPlan = planOptions.find(p => p.id === userPlan);
+  const hasActivePlan = userPlan !== 'none';
 
   const handleGenerate = () => {
-    if (userPlan !== 'pro' && (videoDuration > 30 || enableMotion)) {
-      alert('🚀 Upgrade to Pro for videos over 30s and motion graphics!');
+    if (!hasActivePlan) {
+      alert('🚀 Subscribe to a plan to start creating videos!');
       return;
     }
-    if (userCredits < 50) {
-      alert('Not enough credits! Upgrade or buy more.');
+    if (inputMode === 'script' && !script) {
+      alert('Please enter a script or switch to Topic mode');
+      return;
+    }
+    if (inputMode === 'topic' && !topic) {
+      alert('Please enter a topic or switch to Script mode');
       return;
     }
     setIsGenerating(true);
     setTimeout(() => setIsGenerating(false), 3000);
   };
 
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (planId) => {
+    const plan = planOptions.find(p => p.id === planId);
     try {
       await fetch(`${BACKEND_URL}/health`);
       
       const orderRes = await fetch(`${BACKEND_URL}/create-subscription`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: 1 }) // ₹1 test. Change to 999 for prod
+        body: JSON.stringify({ 
+          amount: 1, // ₹1 for test. Use plan.price for prod
+          plan: planId 
+        })
       });
 
       if (!orderRes.ok) throw new Error('Failed to create order');
@@ -48,13 +80,13 @@ function App() {
         amount: order.amount,
         currency: order.currency,
         order_id: order.orderId,
-        name: 'AutoVid Pro',
-        description: 'Pro Plan - 20min videos + Motion Graphics',
+        name: `AutoVid ${plan.name}`,
+        description: `${plan.videosPerWeek} video${plan.videosPerWeek > 1 ? 's' : ''}/week + Motion Graphics`,
         prefill: { email: userEmail },
         handler: function (response) {
-          alert('✅ Payment Successful! Welcome to Pro 🎉\nRefreshing...');
-          setUserPlan('pro');
-          window.location.reload(); // Webhook updates DB
+          alert(`✅ Payment Successful! Welcome to ${plan.name} 🎉\nRefreshing...`);
+          setUserPlan(planId);
+          window.location.reload();
         },
         theme: { color: '#7C3AED' }
       };
@@ -68,6 +100,54 @@ function App() {
     }
   };
 
+  // If no active plan, show paywall
+  if (!hasActivePlan) {
+    return (
+      <div className="min-h-screen bg-[#0F0F0F] text-white font-sans flex items-center justify-center p-6">
+        <div className="max-w-5xl w-full">
+          <div className="text-center mb-12">
+            <div className="w-16 h-16 bg-gradient-to-br from-[#7C3AED] to-[#A855F7] rounded-2xl flex items-center justify-center font-bold text-2xl mx-auto mb-4">
+              A
+            </div>
+            <h1 className="text-4xl font-bold mb-3">AutoVid Pro</h1>
+            <p className="text-gray-400 text-lg">FacelessReels Automation: 30s to 20min videos on autopilot</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {planOptions.map((plan) => (
+              <div key={plan.id} className="bg-[#1A1A1A] border border-[#262626] rounded-xl p-6 hover:border-[#7C3AED] transition-all">
+                <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
+                <div className="mb-4">
+                  <span className="text-3xl font-bold">₹{plan.price}</span>
+                  <span className="text-gray-400">/month</span>
+                </div>
+                <ul className="space-y-2 mb-6 text-sm text-gray-300">
+                  <li>✓ {plan.videosPerWeek} video{plan.videosPerWeek > 1 ? 's' : ''} per week</li>
+                  <li>✓ 30s to 20min duration</li>
+                  <li>✓ Motion graphics</li>
+                  <li>✓ Auto-posting</li>
+                  <li>✓ No watermark</li>
+                  <li>✓ 4K export</li>
+                </ul>
+                <button
+                  onClick={() => handleUpgrade(plan.id)}
+                  className="w-full bg-gradient-to-r from-[#7C3AED] to-[#A855F7] hover:from-[#6D28D9] hover:to-[#9333EA] text-white font-semibold py-3 rounded-lg"
+                >
+                  Start {plan.name}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-xs text-gray-500">
+            🔒 No free tier. All plans include script-to-video, voice, motion graphics, and autopilot posting.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Main app for paid users
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-white font-sans">
       {/* Header */}
@@ -79,24 +159,12 @@ function App() {
             </div>
             <div>
               <h1 className="text-xl font-bold">AutoVid Pro</h1>
-              <p className="text-xs text-gray-400">20min Videos + Motion Graphics</p>
+              <p className="text-xs text-gray-400">{selectedPlan?.name} Plan · {selectedPlan?.videosPerWeek}x/week</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {userPlan === 'pro' ? (
-              <button className="px-4 py-2 bg-gradient-to-r from-[#7C3AED] to-[#A855F7] rounded-lg text-sm font-semibold">
-                💎 PRO ACTIVE
-              </button>
-            ) : (
-              <button 
-                onClick={handleUpgrade}
-                className="px-4 py-2 bg-gradient-to-r from-[#7C3AED] to-[#A855F7] hover:from-[#6D28D9] hover:to-[#9333EA] rounded-lg text-sm font-semibold"
-              >
-                🚀 Upgrade to Pro
-              </button>
-            )}
-            <button className="px-4 py-2 bg-[#1F1F1F] hover:bg-[#262626] rounded-lg text-sm border border-[#262626]">
-              💎 {userCredits} Credits
+            <button className="px-4 py-2 bg-gradient-to-r from-[#7C3AED] to-[#A855F7] rounded-lg text-sm font-semibold">
+              💎 {selectedPlan?.name.toUpperCase()}
             </button>
             <div className="w-9 h-9 bg-[#262626] rounded-full flex items-center justify-center">
               P
@@ -110,28 +178,16 @@ function App() {
         <aside className="w-64 border-r border-[#262626] h-[calc(100vh-73px)] p-4">
           <div className="space-y-2">
             <button 
-              onClick={() => setActiveTab('script')}
-              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 ${activeTab === 'script' ? 'bg-[#7C3AED] text-white' : 'hover:bg-[#1F1F1F] text-gray-300'}`}
+              onClick={() => setActiveTab('create')}
+              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 ${activeTab === 'create' ? 'bg-[#7C3AED] text-white' : 'hover:bg-[#1F1F1F] text-gray-300'}`}
             >
-              <span>📝</span> Script Studio
+              <span>🎬</span> Create Video
             </button>
             <button 
-              onClick={() => setActiveTab('voice')}
-              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 ${activeTab === 'voice' ? 'bg-[#7C3AED] text-white' : 'hover:bg-[#1F1F1F] text-gray-300'}`}
+              onClick={() => setActiveTab('queue')}
+              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 ${activeTab === 'queue' ? 'bg-[#7C3AED] text-white' : 'hover:bg-[#1F1F1F] text-gray-300'}`}
             >
-              <span>🎙️</span> Voice Engine
-            </button>
-            <button 
-              onClick={() => setActiveTab('media')}
-              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 ${activeTab === 'media' ? 'bg-[#7C3AED] text-white' : 'hover:bg-[#1F1F1F] text-gray-300'}`}
-            >
-              <span>🎬</span> Media Vault
-            </button>
-            <button 
-              onClick={() => setActiveTab('timeline')}
-              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 ${activeTab === 'timeline' ? 'bg-[#7C3AED] text-white' : 'hover:bg-[#1F1F1F] text-gray-300'}`}
-            >
-              <span>✂️</span> Timeline Editor
+              <span>📅</span> Autopilot Queue
             </button>
             <button 
               onClick={() => setActiveTab('analytics')}
@@ -139,75 +195,137 @@ function App() {
             >
               <span>📊</span> Analytics
             </button>
+            <button 
+              onClick={() => setActiveTab('settings')}
+              className={`w-full text-left px-4 py-3 rounded-lg flex items-center gap-3 ${activeTab === 'settings' ? 'bg-[#7C3AED] text-white' : 'hover:bg-[#1F1F1F] text-gray-300'}`}
+            >
+              <span>⚙️</span> Settings
+            </button>
           </div>
 
-          {userPlan === 'free' && (
-            <div className="mt-8 p-4 bg-gradient-to-br from-[#7C3AED]/20 to-[#A855F7]/20 rounded-lg border border-[#7C3AED]/50">
-              <h3 className="text-sm font-semibold mb-2">🚀 Unlock Pro</h3>
-              <p className="text-xs text-gray-300 mb-3">• 20min videos<br/>• Motion graphics<br/>• No watermark<br/>• 4K export</p>
-              <button 
-                onClick={handleUpgrade}
-                className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold py-2 rounded-lg"
-              >
-                Upgrade - ₹999/mo
-              </button>
-            </div>
-          )}
+          <div className="mt-8 p-4 bg-[#1A1A1A] rounded-lg border border-[#262626]">
+            <h3 className="text-sm font-semibold mb-2">Your Plan</h3>
+            <p className="text-xs text-gray-400 mb-1">{selectedPlan?.name} · ₹{selectedPlan?.price}/mo</p>
+            <p className="text-xs text-gray-400">{selectedPlan?.videosPerWeek} videos/week quota</p>
+          </div>
         </aside>
 
         {/* Main Content */}
         <main className="flex-1 p-8">
           <div className="max-w-4xl mx-auto">
             <div className="mb-6">
-              <h2 className="text-3xl font-bold mb-2">Create Viral Content up to 20 Minutes</h2>
-              <p className="text-gray-400">Paste script, pick voice, add motion graphics, export 4K.</p>
+              <h2 className="text-3xl font-bold mb-2">Create Video on Autopilot</h2>
+              <p className="text-gray-400">Script or topic → Pick duration → Set series → Auto-post {selectedPlan?.videosPerWeek}x/week</p>
             </div>
 
-            {/* Script Input */}
+            {/* Input Mode Toggle */}
+            <div className="flex gap-2 mb-6 bg-[#1A1A1A] p-1 rounded-lg w-fit">
+              <button
+                onClick={() => setInputMode('script')}
+                className={`px-4 py-2 rounded-md text-sm font-semibold ${inputMode === 'script' ? 'bg-[#7C3AED] text-white' : 'text-gray-400'}`}
+              >
+                📝 Your Script
+              </button>
+              <button
+                onClick={() => setInputMode('topic')}
+                className={`px-4 py-2 rounded-md text-sm font-semibold ${inputMode === 'topic' ? 'bg-[#7C3AED] text-white' : 'text-gray-400'}`}
+              >
+                💡 Topic List
+              </button>
+            </div>
+
+            {/* Script/Topic Input */}
             <div className="bg-[#1A1A1A] border border-[#262626] rounded-xl p-6 mb-6">
-              <label className="block text-sm font-semibold mb-3 text-gray-300">Your Script</label>
-              <textarea
-                value={script}
-                onChange={(e) => setScript(e.target.value)}
-                placeholder="Did you know that 90% of creators fail because they don't hook viewers in 3 seconds? Here's how to fix it..."
-                className="w-full h-40 bg-[#0F0F0F] border border-[#262626] rounded-lg p-4 text-white placeholder-gray-500 focus:outline-none focus:border-[#7C3AED] resize-none"
-              />
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-xs text-gray-500">{script.length} chars · ~{Math.ceil(script.length / 15)}s</span>
-                <button className="text-xs text-[#7C3AED] hover:text-[#A855F7]">✨ Enhance with AI</button>
-              </div>
+              {inputMode === 'script' ? (
+                <>
+                  <label className="block text-sm font-semibold mb-3 text-gray-300">Your Script</label>
+                  <textarea
+                    value={script}
+                    onChange={(e) => setScript(e.target.value)}
+                    placeholder="Paste your full script here..."
+                    className="w-full h-40 bg-[#0F0F0F] border border-[#262626] rounded-lg p-4 text-white placeholder-gray-500 focus:outline-none focus:border-[#7C3AED] resize-none"
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="block text-sm font-semibold mb-3 text-gray-300">Topic or Niche</label>
+                  <input
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder="e.g. 'Motivational quotes', 'Crypto news', 'Fitness tips'"
+                    className="w-full bg-[#0F0F0F] border border-[#262626] rounded-lg p-4 text-white placeholder-gray-500 focus:outline-none focus:border-[#7C3AED]"
+                  />
+                  <p className="text-xs text-gray-500 mt-2">AI will generate scripts from your topic automatically</p>
+                </>
+              )}
             </div>
 
-            {/* Pro Settings */}
+            {/* Video Settings */}
             <div className="bg-[#1A1A1A] border border-[#262626] rounded-xl p-6 mb-6">
               <h3 className="text-sm font-semibold mb-4 text-gray-300">Video Settings</h3>
               
               <div className="mb-4">
-                <label className="block text-xs text-gray-400 mb-2">Duration: {videoDuration}s {videoDuration > 30 && !canUseMotion && '(Pro only)'}</label>
-                <input 
-                  type="range" 
-                  min="15" 
-                  max={maxDuration} 
-                  value={videoDuration}
-                  onChange={(e) => setVideoDuration(Number(e.target.value))}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>15s</span>
-                  <span>{maxDuration === 1200 ? '20min' : '30s'}</span>
+                <label className="block text-xs text-gray-400 mb-3">Duration</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {durationOptions.map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setVideoDuration(opt.value)}
+                      className={`p-3 rounded-lg text-sm font-semibold border transition-all ${
+                        videoDuration === opt.value 
+                          ? 'bg-[#7C3AED] border-[#7C3AED] text-white' 
+                          : 'bg-[#1F1F1F] border-[#262626] hover:border-[#7C3AED] text-gray-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
+              <div className="mb-4">
+                <label className="block text-xs text-gray-400 mb-3">Content Type</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setContentType('random')}
+                    className={`flex-1 p-3 rounded-lg text-sm font-semibold border ${contentType === 'random' ? 'bg-[#7C3AED] border-[#7C3AED]' : 'bg-[#1F1F1F] border-[#262626]'}`}
+                  >
+                    🎲 Random Videos
+                  </button>
+                  <button
+                    onClick={() => setContentType('series')}
+                    className={`flex-1 p-3 rounded-lg text-sm font-semibold border ${contentType === 'series' ? 'bg-[#7C3AED] border-[#7C3AED]' : 'bg-[#1F1F1F] border-[#262626]'}`}
+                  >
+                    📺 Series
+                  </button>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-xs text-gray-400 mb-3">Autopilot Frequency</label>
+                <select
+                  value={postFrequency}
+                  onChange={(e) => setPostFrequency(e.target.value)}
+                  className="w-full bg-[#0F0F0F] border border-[#262626] rounded-lg p-3 text-white focus:outline-none focus:border-[#7C3AED]"
+                >
+                  {frequencyOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label} ({opt.videosPerWeek} videos/week)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between pt-4 border-t border-[#262626]">
                 <div>
                   <p className="text-sm font-semibold">Motion Graphics</p>
                   <p className="text-xs text-gray-400">Auto B-roll, transitions, zoom effects</p>
                 </div>
                 <button
-                  onClick={() => canUseMotion ? setEnableMotion(!enableMotion) : handleUpgrade()}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold ${enableMotion ? 'bg-[#7C3AED]' : 'bg-[#262626]'} ${!canUseMotion ? 'opacity-50 cursor-pointer' : ''}`}
+                  onClick={() => setEnableMotion(!enableMotion)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold ${enableMotion ? 'bg-[#7C3AED]' : 'bg-[#262626]'}`}
                 >
-                  {canUseMotion ? (enableMotion ? 'ON' : 'OFF') : '🔒 PRO'}
+                  {enableMotion ? 'ON' : 'OFF'}
                 </button>
               </div>
             </div>
@@ -215,14 +333,12 @@ function App() {
             {/* Generate Button */}
             <button
               onClick={handleGenerate}
-              disabled={isGenerating || !script}
+              disabled={isGenerating}
               className="w-full bg-gradient-to-r from-[#7C3AED] to-[#A855F7] hover:from-[#6D28D9] hover:to-[#9333EA] disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl text-lg transition-all"
             >
-              {userPlan !== 'pro' && (videoDuration > 30 || enableMotion) 
-                ? '🔒 Upgrade to Pro for 20min + Motion' 
-                : isGenerating 
-                ? 'Generating Video... ⏳' 
-                : `🚀 Generate ${videoDuration}s Video - 50 Credits`}
+              {isGenerating 
+                ? 'Generating & Queuing... ⏳' 
+                : `🚀 Generate ${durationOptions.find(d=>d.value===videoDuration)?.label} Video`}
             </button>
 
             {isGenerating && (
@@ -230,8 +346,8 @@ function App() {
                 <div className="flex items-center gap-4 mb-4">
                   <div className="w-12 h-12 border-4 border-[#7C3AED] border-t-transparent rounded-full animate-spin"></div>
                   <div>
-                    <p className="font-semibold">Rendering your video...</p>
-                    <p className="text-sm text-gray-400">Adding motion graphics · Syncing voice · Exporting 4K</p>
+                    <p className="font-semibold">Rendering + Scheduling...</p>
+                    <p className="text-sm text-gray-400">Motion graphics · Voice sync · Adding to autopilot queue</p>
                   </div>
                 </div>
                 <div className="w-full bg-[#262626] rounded-full h-2">
