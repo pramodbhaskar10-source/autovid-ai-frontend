@@ -11,13 +11,12 @@ function App() {
   const [videoDuration, setVideoDuration] = useState(30);
   const [selectedStyle, setSelectedStyle] = useState('studio Ghibli');
   const [selectedVoice, setSelectedVoice] = useState('Rachel');
-  const [contentType, setContentType] = useState('random');
   const [jobId, setJobId] = useState(null);
   const [jobStatus, setJobStatus] = useState(null);
   
   const BACKEND_URL = 'https://autovid-ai-10.onrender.com';
   const userEmail = 'pramodbhaskar10@gmail.com'; // TODO: Get from auth
-  const API_KEY = 'avp_live_' + process.env.REACT_APP_MASTER_KEY; // Add to Vercel env
+  const API_KEY = 'avp_live_' + process.env.REACT_APP_MASTER_KEY;
   
   const durationOptions = [
     { label: '30 seconds', value: '0.5' },
@@ -31,7 +30,6 @@ function App() {
   const styleOptions = ['studio Ghibli', 'LEGO', 'pixar', 'cyberpunk', 'anime', 'realistic', 'watercolor', 'comic book', 'oil painting'];
   const voiceOptions = ['Rachel', 'Domi', 'Bella', 'Antoni', 'Elli', 'Nova'];
 
-  // Check user plan on load
   useEffect(() => {
     fetch(`${BACKEND_URL}/user/${userEmail}`)
       .then(res => res.json())
@@ -45,7 +43,6 @@ function App() {
       });
   }, []);
 
-  // Poll job status
   useEffect(() => {
     if (!jobId || !isGenerating) return;
     const interval = setInterval(async () => {
@@ -145,7 +142,6 @@ function App() {
     }
   };
 
-  // Paywall if no plan
   if (userPlan === 'none' || userPlan === 'free') {
     return (
       <div className="min-h-screen bg-[#0F0F0F] text-white font-sans flex items-center justify-center p-6">
@@ -162,7 +158,6 @@ function App() {
     );
   }
 
-  // Main app for paid users
   return (
     <div className="min-h-screen bg-[#0F0F0F] text-white font-sans">
       <header className="border-b border-[#262626] px-6 py-4">
