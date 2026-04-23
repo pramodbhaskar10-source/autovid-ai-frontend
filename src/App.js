@@ -5,12 +5,12 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState('script');
   const [userPlan, setUserPlan] = useState('free'); // 'free' or 'pro'
-  const [userCredits, setUserCredits] = useState(1250);
   const [videoDuration, setVideoDuration] = useState(30); // seconds
   const [enableMotion, setEnableMotion] = useState(false);
-  const [userEmail, setUserEmail] = useState('pramodbhaskar10@gmail.com'); // TODO: Get from auth
   
   const BACKEND_URL = 'https://autovid-ai-10.onrender.com';
+  const userCredits = 1250; // Fixed - no setUserCredits needed yet
+  const userEmail = 'pramodbhaskar10@gmail.com'; // TODO: Get from auth later
   
   // FacelessReels logic: Free = 30s max, no motion. Pro = 20min + motion
   const maxDuration = userPlan === 'pro' ? 1200 : 30; // 20min = 1200s
