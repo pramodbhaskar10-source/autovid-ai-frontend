@@ -28,11 +28,7 @@ function App() {
     { label: '20 minutes', value: '20' },
   ];
 
-  const styleOptions = Object.keys({
-    'studio Ghibli': 1, 'LEGO': 1, 'pixar': 1, 'cyberpunk': 1, 'anime': 1, 
-    'realistic': 1, 'watercolor': 1, 'comic book': 1, 'oil painting': 1
-  });
-
+  const styleOptions = ['studio Ghibli', 'LEGO', 'pixar', 'cyberpunk', 'anime', 'realistic', 'watercolor', 'comic book', 'oil painting'];
   const voiceOptions = ['Rachel', 'Domi', 'Bella', 'Antoni', 'Elli', 'Nova'];
 
   // Check user plan on load
@@ -42,6 +38,10 @@ function App() {
       .then(data => {
         setUserPlan(data.plan || 'free');
         setUserCredits(data.credits || 0);
+      })
+      .catch(() => {
+        setUserPlan('free');
+        setUserCredits(10);
       });
   }, []);
 
@@ -49,18 +49,22 @@ function App() {
   useEffect(() => {
     if (!jobId || !isGenerating) return;
     const interval = setInterval(async () => {
-      const res = await fetch(`${BACKEND_URL}/api/status/${jobId}`);
-      const data = await res.json();
-      setJobStatus(data);
-      if (data.status === 'completed' || data.status === 'failed') {
-        setIsGenerating(false);
-        clearInterval(interval);
-        if (data.status === 'completed') {
-          alert(`✅ Video ready! ${data.videoUrl}`);
-          window.open(data.videoUrl, '_blank');
-        } else {
-          alert(`❌ Failed: ${data.error}`);
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/status/${jobId}`);
+        const data = await res.json();
+        setJobStatus(data);
+        if (data.status === 'completed' || data.status === 'failed') {
+          setIsGenerating(false);
+          clearInterval(interval);
+          if (data.status === 'completed') {
+            alert(`✅ Video ready! ${data.videoUrl}`);
+            window.open(data.videoUrl, '_blank');
+          } else {
+            alert(`❌ Failed: ${data.error}`);
+          }
         }
+      } catch (err) {
+        console.error('Poll error:', err);
       }
     }, 3000);
     return () => clearInterval(interval);
@@ -116,7 +120,7 @@ function App() {
       const res = await fetch(`${BACKEND_URL}/create-subscription`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: 1, plan: planId }) // ₹1 test
+        body: JSON.stringify({ amount: 1, plan: planId })
       });
       const order = await res.json();
       
@@ -169,6 +173,7 @@ function App() {
               <h1 className="text-xl font-bold">AutoVid Pro</h1>
               <p className="text-xs text-gray-400">{userPlan.toUpperCase()} · {userCredits} credits left</p>
             </div>
+          </div>
           <div className="w-9 h-9 bg-[#262626] rounded-full flex items-center justify-center">P</div>
         </div>
       </header>
@@ -248,7 +253,8 @@ function App() {
                 <div className="w-full bg-[#262626] rounded-full h-2">
                   <div className="bg-[#7C3AED] h-2 rounded-full" style={{width: `${jobStatus.progress}%`}}></div>
                 </div>
-                {jobStatus.videoUrl && <a href={jobStatus.videoUrl} target="_blank" className="text-[#7C3AED] text-sm mt-2 block">Open Video →</a>}
+                {jobStatus.videoUrl && <a href={jobStatus.videoUrl} target="_blank" rel="noopener noreferrer" className="text-[#7C3AED] text-sm mt-2 block">Open Video →</a>}
+                {jobStatus.error && <p className="text-red-500 text-sm mt-2">Error: {jobStatus.error}</p>}
               </div>
             )}
           </div>
