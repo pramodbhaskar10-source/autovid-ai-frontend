@@ -4,10 +4,68 @@ function App() {
   const [script, setScript] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState('script');
+  const [userPlan, setUserPlan] = useState('free'); // 'free' or 'pro'
+  const [userCredits, setUserCredits] = useState(1250);
+  const [videoDuration, setVideoDuration] = useState(30); // seconds
+  const [enableMotion, setEnableMotion] = useState(false);
+  const [userEmail, setUserEmail] = useState('pramodbhaskar10@gmail.com'); // TODO: Get from auth
   
+  const BACKEND_URL = 'https://autovid-ai-10.onrender.com';
+  
+  // FacelessReels logic: Free = 30s max, no motion. Pro = 20min + motion
+  const maxDuration = userPlan === 'pro' ? 1200 : 30; // 20min = 1200s
+  const canUseMotion = userPlan === 'pro';
+
   const handleGenerate = () => {
+    if (userPlan !== 'pro' && (videoDuration > 30 || enableMotion)) {
+      alert('🚀 Upgrade to Pro for videos over 30s and motion graphics!');
+      return;
+    }
+    if (userCredits < 50) {
+      alert('Not enough credits! Upgrade or buy more.');
+      return;
+    }
     setIsGenerating(true);
     setTimeout(() => setIsGenerating(false), 3000);
+  };
+
+  const handleUpgrade = async () => {
+    try {
+      await fetch(`${BACKEND_URL}/health`);
+      
+      const orderRes = await fetch(`${BACKEND_URL}/create-subscription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: 1 }) // ₹1 test. Change to 999 for prod
+      });
+
+      if (!orderRes.ok) throw new Error('Failed to create order');
+      
+      const order = await orderRes.json();
+      
+      const options = {
+        key: order.key,
+        amount: order.amount,
+        currency: order.currency,
+        order_id: order.orderId,
+        name: 'AutoVid Pro',
+        description: 'Pro Plan - 20min videos + Motion Graphics',
+        prefill: { email: userEmail },
+        handler: function (response) {
+          alert('✅ Payment Successful! Welcome to Pro 🎉\nRefreshing...');
+          setUserPlan('pro');
+          window.location.reload(); // Webhook updates DB
+        },
+        theme: { color: '#7C3AED' }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+
+    } catch (error) {
+      console.error(error);
+      alert('Payment failed: ' + error.message);
+    }
   };
 
   return (
@@ -21,12 +79,24 @@ function App() {
             </div>
             <div>
               <h1 className="text-xl font-bold">AutoVid Pro</h1>
-              <p className="text-xs text-gray-400">AI Video Automation Studio</p>
+              <p className="text-xs text-gray-400">20min Videos + Motion Graphics</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
+            {userPlan === 'pro' ? (
+              <button className="px-4 py-2 bg-gradient-to-r from-[#7C3AED] to-[#A855F7] rounded-lg text-sm font-semibold">
+                💎 PRO ACTIVE
+              </button>
+            ) : (
+              <button 
+                onClick={handleUpgrade}
+                className="px-4 py-2 bg-gradient-to-r from-[#7C3AED] to-[#A855F7] hover:from-[#6D28D9] hover:to-[#9333EA] rounded-lg text-sm font-semibold"
+              >
+                🚀 Upgrade to Pro
+              </button>
+            )}
             <button className="px-4 py-2 bg-[#1F1F1F] hover:bg-[#262626] rounded-lg text-sm border border-[#262626]">
-              💎 1,250 Credits
+              💎 {userCredits} Credits
             </button>
             <div className="w-9 h-9 bg-[#262626] rounded-full flex items-center justify-center">
               P
@@ -71,18 +141,26 @@ function App() {
             </button>
           </div>
 
-          <div className="mt-8 p-4 bg-[#1A1A1A] rounded-lg border border-[#262626]">
-            <h3 className="text-sm font-semibold mb-2">Pro Tips</h3>
-            <p className="text-xs text-gray-400">Keep scripts under 60s for best retention. Use hooks in first 3 seconds.</p>
-          </div>
+          {userPlan === 'free' && (
+            <div className="mt-8 p-4 bg-gradient-to-br from-[#7C3AED]/20 to-[#A855F7]/20 rounded-lg border border-[#7C3AED]/50">
+              <h3 className="text-sm font-semibold mb-2">🚀 Unlock Pro</h3>
+              <p className="text-xs text-gray-300 mb-3">• 20min videos<br/>• Motion graphics<br/>• No watermark<br/>• 4K export</p>
+              <button 
+                onClick={handleUpgrade}
+                className="w-full bg-[#7C3AED] hover:bg-[#6D28D9] text-white text-xs font-semibold py-2 rounded-lg"
+              >
+                Upgrade - ₹999/mo
+              </button>
+            </div>
+          )}
         </aside>
 
         {/* Main Content */}
         <main className="flex-1 p-8">
           <div className="max-w-4xl mx-auto">
             <div className="mb-6">
-              <h2 className="text-3xl font-bold mb-2">Create Viral Shorts in Minutes</h2>
-              <p className="text-gray-400">Paste your script, pick a voice, get a full video with captions.</p>
+              <h2 className="text-3xl font-bold mb-2">Create Viral Content up to 20 Minutes</h2>
+              <p className="text-gray-400">Paste script, pick voice, add motion graphics, export 4K.</p>
             </div>
 
             {/* Script Input */}
@@ -95,44 +173,42 @@ function App() {
                 className="w-full h-40 bg-[#0F0F0F] border border-[#262626] rounded-lg p-4 text-white placeholder-gray-500 focus:outline-none focus:border-[#7C3AED] resize-none"
               />
               <div className="flex items-center justify-between mt-3">
-                <span className="text-xs text-gray-500">{script.length} characters · ~{Math.ceil(script.length / 15)}s</span>
+                <span className="text-xs text-gray-500">{script.length} chars · ~{Math.ceil(script.length / 15)}s</span>
                 <button className="text-xs text-[#7C3AED] hover:text-[#A855F7]">✨ Enhance with AI</button>
               </div>
             </div>
 
-            {/* Voice Selector */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="bg-[#1A1A1A] border border-[#7C3AED] rounded-lg p-4 cursor-pointer">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-[#7C3AED] rounded-full"></div>
-                  <div>
-                    <p className="font-semibold text-sm">Emma Pro</p>
-                    <p className="text-xs text-gray-400">Confident · US</p>
-                  </div>
-                </div>
-                <button className="text-xs text-gray-400 hover:text-white">▶ Preview</button>
-              </div>
+            {/* Pro Settings */}
+            <div className="bg-[#1A1A1A] border border-[#262626] rounded-xl p-6 mb-6">
+              <h3 className="text-sm font-semibold mb-4 text-gray-300">Video Settings</h3>
               
-              <div className="bg-[#1A1A1A] border border-[#262626] rounded-lg p-4 cursor-pointer hover:border-[#7C3AED]">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-[#262626] rounded-full"></div>
-                  <div>
-                    <p className="font-semibold text-sm">Marcus</p>
-                    <p className="text-xs text-gray-400">Deep · UK</p>
-                  </div>
+              <div className="mb-4">
+                <label className="block text-xs text-gray-400 mb-2">Duration: {videoDuration}s {videoDuration > 30 && !canUseMotion && '(Pro only)'}</label>
+                <input 
+                  type="range" 
+                  min="15" 
+                  max={maxDuration} 
+                  value={videoDuration}
+                  onChange={(e) => setVideoDuration(Number(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>15s</span>
+                  <span>{maxDuration === 1200 ? '20min' : '30s'}</span>
                 </div>
-                <button className="text-xs text-gray-400 hover:text-white">▶ Preview</button>
               </div>
 
-              <div className="bg-[#1A1A1A] border border-[#262626] rounded-lg p-4 cursor-pointer hover:border-[#7C3AED]">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 bg-[#262626] rounded-full"></div>
-                  <div>
-                    <p className="font-semibold text-sm">Sofia</p>
-                    <p className="text-xs text-gray-400">Warm · IN</p>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold">Motion Graphics</p>
+                  <p className="text-xs text-gray-400">Auto B-roll, transitions, zoom effects</p>
                 </div>
-                <button className="text-xs text-gray-400 hover:text-white">▶ Preview</button>
+                <button
+                  onClick={() => canUseMotion ? setEnableMotion(!enableMotion) : handleUpgrade()}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold ${enableMotion ? 'bg-[#7C3AED]' : 'bg-[#262626]'} ${!canUseMotion ? 'opacity-50 cursor-pointer' : ''}`}
+                >
+                  {canUseMotion ? (enableMotion ? 'ON' : 'OFF') : '🔒 PRO'}
+                </button>
               </div>
             </div>
 
@@ -142,7 +218,11 @@ function App() {
               disabled={isGenerating || !script}
               className="w-full bg-gradient-to-r from-[#7C3AED] to-[#A855F7] hover:from-[#6D28D9] hover:to-[#9333EA] disabled:from-gray-600 disabled:to-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl text-lg transition-all"
             >
-              {isGenerating ? 'Generating Video... ⏳' : '🚀 Generate Video - 50 Credits'}
+              {userPlan !== 'pro' && (videoDuration > 30 || enableMotion) 
+                ? '🔒 Upgrade to Pro for 20min + Motion' 
+                : isGenerating 
+                ? 'Generating Video... ⏳' 
+                : `🚀 Generate ${videoDuration}s Video - 50 Credits`}
             </button>
 
             {isGenerating && (
@@ -151,7 +231,7 @@ function App() {
                   <div className="w-12 h-12 border-4 border-[#7C3AED] border-t-transparent rounded-full animate-spin"></div>
                   <div>
                     <p className="font-semibold">Rendering your video...</p>
-                    <p className="text-sm text-gray-400">Adding captions · Syncing voice · Exporting 1080p</p>
+                    <p className="text-sm text-gray-400">Adding motion graphics · Syncing voice · Exporting 4K</p>
                   </div>
                 </div>
                 <div className="w-full bg-[#262626] rounded-full h-2">
